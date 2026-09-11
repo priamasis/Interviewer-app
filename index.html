@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Free AI Interview Copilot</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #121212; color: white; text-align: center; padding: 20px; }
+        .container { max-width: 700px; margin: auto; background: #1e1e1e; padding: 20px; border-radius: 10px; }
+        textarea { width: 100%; height: 60px; background: #333; color: white; border: 1px solid #555; padding: 10px; margin-bottom: 10px; box-sizing: border-box; }
+        button { background: #007bff; color: white; border: none; padding: 12px 24px; font-size: 18px; cursor: pointer; border-radius: 5px; margin: 10px; }
+        button:disabled { background: #555; cursor: not-allowed; }
+        .status { color: #28a745; font-weight: bold; margin: 10px; }
+        .box { background: #333; padding: 15px; border-radius: 5px; margin-top: 10px; text-align: left; min-height: 50px; }
+        .answer { background: #007bff; font-size: 22px; font-weight: bold; text-align: justify; }
+        h3 { text-align: left; margin-top: 20px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🤖 AI Interview Copilot (Free Version)</h1>
+    
+    <textarea id="contextInput" placeholder="Ilagay ang job role o resume mo dito... (Hal: Senior Software Engineer with 5 years exp)"></textarea>
+    
+    <button id="startBtn">Start Listening</button>
+    <button id="stopBtn" disabled>Stop</button>
+    
+    <div class="status" id="statusText">Status: OFFLINE</div>
+    
+    <h3>Client's Question:</h3>
+    <div class="box" id="userSpeech">Naghihintay ng tanong...</div>
+    
+    <h3>AI Suggested Answer (Basahin mo ito):</h3>
+    <div class="box answer" id="aiResponse">Dito lalabas ang sagot...</div>
+</div>
+
+<script>
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const statusText = document.getElementById('statusText');
+    const userSpeech = document.getElementById('userSpeech');
+    const aiResponse = document.getElementById('aiResponse');
+    const contextInput = document.getElementById('contextInput');
+
+    let recognition = null;
+    let isListening = false;
+    let isProcessing = false; // Para hindi mag-send nang sunod-sunod
+
+    // Setup Speech Recognition
+    if ('webkitSpeechRecognition' in window) {
+        recognition = new webkitSpeechRecognition();
+    } else if ('SpeechRecognition' in window) {
+        recognition = new SpeechRecognition();
+    } else {
+        alert("Gamitin ang Google Chrome para gumana ito.");
+        startBtn.disabled = true;
+    }
+
+    if (recognition) {
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = 'en-US';
+
+        recognition.onstart = () => {
+            isListening = true;
+            statusText.innerText = "Status: NAKIKINIG...";
+            statusText.style.color = "red";
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+        };
+
+        recognition.onresult = (event) => {
+            let interimTranscript = '';
+            let finalTranscript = '';
+
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                const transcript = event.results[i][0].transcript;
+                if (event.results[i].isFinal) {
+                    finalTranscript += transcript;
+                } else {
+                    interimTranscript += transcript;
+                }
+            }
+
+            userSpeech.innerText = interimTranscript + finalTranscript;
+
+            // Kapag tapos na magsalita at hindi pa nagpoprocess ang AI
+            if (finalTranscript.trim().length > 0 && !isProcessing) {
+                askAI(finalTranscript);
+            }
+        };
+
+        recognition.onerror = (event) => {
+            statusText.innerText = "Error sa Mic: " + event.error;
+        };
+
+        recognition.onend = () => {
+            if (isListening && !isProcessing) {
+                recognition.start(); // Auto-restart para tuloy-tuloy
+            }
+        };
+    }
+
+    startBtn.onclick = () => {
+        isListening = true;
+        recognition.start();
+    };
+
+    stopBtn.onclick = () => {
+        isListening = false;
+        recognition.stop();
+        statusText.innerText = "Status: OFFLINE";
+        statusText.style.color = "#28a745";
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+    };
+
+    // Libreng AI API (Pollinations.ai) - Walang API Key Required!
+    async function askAI(question) {
+        if (question.length < 5) return;
+        
+        isProcessing = true;
+        aiResponse.innerText = "AI is thinking...";
+        userSpeech.innerText = question;
+
+        const resumeContext = contextInput.value || "I am an IT professional.";
+
+        // Prompt para sa AI
+        const prompt = `You are an expert interviewee. The interviewer asked: "${question}". Based on this profile: "${resumeContext}", provide a concise, confident, and professional answer in 2 to 3 sentences. Speak in first person.`;
+
+        try {
+            // Gamit ang free text generation API ng Pollinations
+            const apiUrl = `https://text.pollinations.ai/${encodeURIComponent(prompt)}?model=openai`;
+            
+            const response = await fetch(apiUrl);
+            const answer = await response.text();
+            
+            aiResponse.innerText = answer;
+        } catch (error) {
+            aiResponse.innerText = "Error connecting to AI. Try again.";
+        } finally {
+            isProcessing = false; // Tapos na ang processing, pwede na ulit makinig
+        }
+    }
+</script>
+</body>
+</html>
